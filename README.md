@@ -14,7 +14,18 @@ A high-availability, multi-tenant B2B SaaS document engine ("Mini-Notion") engin
 
 ## 🏗️ Architecture Blueprint
 
-Use code with caution.[Next.js Client] ──► [NGINX Gateway (Rate Limiter / Proxy)]│┌───────────────┼───────────────┐▼               ▼               ▼[NestJS Node 1] [NestJS Node 2] [NestJS Node 3]│               │               │└───────┬───────┴───────┬───────┘▼               ▼[Redis Cache]  [PostgreSQL DB]
+```text
+[Next.js Client] ──► [NGINX Gateway (Rate Limiter / Proxy)]
+                                 │
+                 ┌───────────────┼───────────────┐
+                 ▼               ▼               ▼
+          [NestJS Node 1] [NestJS Node 2] [NestJS Node 3]
+                 │               │               │
+                 └───────┬───────┴───────┬───────┘
+                         ▼               ▼
+                    [Redis Cache]  [PostgreSQL DB]
+```
+
 ### ⚡ Key Features & DevOps Layers
 * **Horizontal Scaling:** Scaled the application layer across 3 stateless NestJS container replicas managed by an NGINX round-robin load balancer configuration.
 * **IP Rate Limiting:** Throttled requests at the edge gateway layer via NGINX `limit_req_zone` directives to protect services from brute-force scripts.
