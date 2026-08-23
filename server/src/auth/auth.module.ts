@@ -5,6 +5,7 @@ import { betterAuth } from 'better-auth/minimal';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { DatabaseModule } from '../database/database.module';
 import { PrismaService } from '../database/prisma/prisma.service';
+import { organization } from 'better-auth/plugins';
 
 @Module({
   imports: [
@@ -30,6 +31,26 @@ import { PrismaService } from '../database/prisma/prisma.service';
           emailAndPassword: {
             enabled: true,
           },
+          plugins: [
+            organization({
+              allowUserToCreateOrganization: true,
+              organizationLimit: 5,
+              membershipLimit: 100,
+              creatorRole: 'owner',
+              disableOrganizationDeletion: true,
+              schema: {
+                organization: {
+                  modelName: 'workspace',
+                },
+                member: {
+                  modelName: 'member',
+                },
+                invitation: {
+                  modelName: 'invitation',
+                },
+              },
+            }),
+          ],
         }),
       }),
       isGlobal: true,

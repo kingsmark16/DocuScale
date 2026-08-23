@@ -8,8 +8,22 @@ import { PrismaService } from './../src/database/prisma/prisma.service';
 
 type AuthResponse = {
   user: {
+    id: string;
     email: string;
   };
+};
+
+type OrganizationResponse = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type FullOrganizationResponse = {
+  id: string;
+  members: Array<{
+    role: string;
+  }>;
 };
 
 describe('AppController (e2e)', () => {
@@ -35,10 +49,11 @@ describe('AppController (e2e)', () => {
     await app.close();
   });
   it('/health (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/health')
-      .expect(200)
-      .expect({ status: 'ok', database: 'up' });
+    return request(app.getHttpServer()).get('/health').expect(200).expect({
+      status: 'ok',
+      database: 'up',
+      redis: 'up',
+    });
   });
   it('/api/auth/ok (GET)', () => {
     return request(app.getHttpServer()).get('/api/auth/ok').expect(200);
@@ -79,6 +94,117 @@ describe('AppController (e2e)', () => {
       if (userCreated) {
         await app.get(PrismaService).user.delete({
           where: { email },
+        });
+      }
+    }
+  });
+  it('/api/auth organization flow', async () => {
+    const email = `organization-e2e-${Date.now()}@example.com`;
+    const password = 'StrongPassword123!';
+    const slug = `e2e-workspace-${Date.now()}`;
+    const client = request.agent(app.getHttpServer());
+    let userCreated = false;
+    let workspaceId: string | undefined;
+    const outsiderEmail = `outsider-${Date.now()}@example.com`;
+    const outsiderClient = request.agent(app.getHttpServer());
+    let outsiderCreated = false;
+
+    try {
+      const signUpResponse = await client
+        .post('/api/auth/sign-up/email')
+        .send({
+          name: 'Organization E2E User',
+          email,
+          password,
+        })
+        .expect(200);
+
+      userCreated = true;
+
+      const signUpBody = signUpResponse.body as unknown as AuthResponse;
+      expect(signUpBody.user.email).toBe(email);
+
+      const createOrganizationResponse = await client
+        .post('/api/auth/organization/create')
+        .send({
+          name: 'E2E Workspace',
+          slug,
+        })
+        .expect(200);
+
+      const organization =
+        createOrganizationResponse.body as unknown as OrganizationResponse;
+
+      workspaceId = organization.id;
+
+      expect(organization.name).toBe('E2E Workspace');
+      expect(organization.slug).toBe(slug);
+
+      const fullOrganizationResponse = await client
+        .get('/api/auth/organization/get-full-organization')
+        .query({ organizationId: workspaceId })
+        .expect(200);
+
+      const fullOrganization =
+        fullOrganizationResponse.body as unknown as FullOrganizationResponse;
+
+      expect(fullOrganization.id).toBe(workspaceId);
+      expect(fullOrganization.members).toHaveLength(1);
+      expect(fullOrganization.members[0].role).toBe('owner');
+
+      await client
+        .post('/api/auth/organization/set-active')
+        .send({ organizationId: workspaceId })
+        .expect(200);
+
+      const session = await app.get(PrismaService).session.findFirst({
+        where: { userId: signUpBody.user.id },
+      });
+
+      expect(session?.activeOrganizationId).toBe(workspaceId);
+
+      const accessResponse = await client
+        .get(`/api/w/${workspaceId}/access`)
+        .expect(200);
+
+      expect(accessResponse.body).toEqual({
+        workspaceId,
+        role: 'owner',
+      });
+
+      const outsiderSignUpResponse = await outsiderClient
+        .post('/api/auth/sign-up/email')
+        .send({
+          name: 'Outsider User',
+          email: outsiderEmail,
+          password: 'OutsiderPassword123!',
+        })
+        .expect(200);
+
+      const outsiderSignUpBody =
+        outsiderSignUpResponse.body as unknown as AuthResponse;
+
+      expect(outsiderSignUpBody.user.email).toBe(outsiderEmail);
+      outsiderCreated = true;
+
+      await outsiderClient.get(`/api/w/${workspaceId}/access`).expect(403);
+    } finally {
+      const prisma = app.get(PrismaService);
+
+      if (workspaceId) {
+        await prisma.workspace.delete({
+          where: { id: workspaceId },
+        });
+      }
+
+      if (userCreated) {
+        await prisma.user.delete({
+          where: { email },
+        });
+      }
+      if (outsiderCreated) {
+        await prisma.user.delete({
+          where: { email: outsiderEmail },
         });
       }
     }
