@@ -7,6 +7,7 @@ import { HealthController } from './health/health.controller';
 import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 import { WorkspaceModule } from './workspace/workspace.module';
+import { DocumentsModule } from './documents/documents.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { WorkspaceModule } from './workspace/workspace.module';
     AuthModule,
     RedisModule,
     WorkspaceModule,
+    DocumentsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
