@@ -287,6 +287,15 @@ describe('AppController (e2e)', () => {
       expect(createdDocument.title).toBe('First document');
       expect(createdDocument.workspaceId).toBe(workspaceId);
 
+      const initialListResponse = await client
+        .get(`/api/w/${workspaceId}/docs`)
+        .expect(200);
+
+      const initialDocumentList =
+        initialListResponse.body as unknown as DocumentListResponse;
+
+      expect(initialDocumentList.data).toHaveLength(1);
+
       const secondCreateResponse = await client
         .post(`/api/w/${workspaceId}/docs`)
         .send({
@@ -359,6 +368,19 @@ describe('AppController (e2e)', () => {
       expect(updatedDocument.title).toBe('Updated document');
       expect(updatedDocument.isPublished).toBe(true);
 
+      const refreshedListResponse = await client
+        .get(`/api/w/${workspaceId}/docs`)
+        .expect(200);
+
+      const refreshedDocumentList =
+        refreshedListResponse.body as unknown as DocumentListResponse;
+
+      expect(
+        refreshedDocumentList.data.find(
+          (document) => document.id === createdDocument.id,
+        )?.title,
+      ).toBe('Updated document');
+
       const searchResponse = await client
         .get(`/api/w/${workspaceId}/docs`)
         .query({ search: 'UPDATED' })
@@ -382,6 +404,16 @@ describe('AppController (e2e)', () => {
       await client
         .delete(`/api/w/${workspaceId}/docs/${createdDocument.id}`)
         .expect(200);
+
+      const afterDeleteListResponse = await client
+        .get(`/api/w/${workspaceId}/docs`)
+        .expect(200);
+
+      const afterDeleteList =
+        afterDeleteListResponse.body as unknown as DocumentListResponse;
+
+      expect(afterDeleteList.data).toHaveLength(1);
+      expect(afterDeleteList.data[0].id).toBe(secondDocument.id);
 
       await client
         .get(`/api/w/${workspaceId}/docs/${createdDocument.id}`)
