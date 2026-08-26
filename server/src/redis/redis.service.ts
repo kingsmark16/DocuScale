@@ -56,6 +56,42 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.incr(key);
   }
 
+  async consumeRateLimit(
+    key: string,
+    windowSeconds: number,
+    maxRequests: number,
+  ): Promise<{ allowed: boolean; retryAfter: number | null }> {
+    const result = await this.client.eval(
+      `local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+local retryAfter = redis.call('TTL', KEYS[1])
+if count <= tonumber(ARGV[2]) then
+  return {1, retryAfter}
+end
+return {0, retryAfter}`,
+      {
+        keys: [key],
+        arguments: [String(windowSeconds), String(maxRequests)],
+      },
+    );
+
+    if (
+      !Array.isArray(result) ||
+      result.length < 2 ||
+      typeof result[0] !== 'number' ||
+      typeof result[1] !== 'number'
+    ) {
+      throw new Error('Redis rate-limit counter returned an invalid value');
+    }
+
+    return {
+      allowed: result[0] === 1,
+      retryAfter: result[1] > 0 ? result[1] : null,
+    };
+  }
+
   async del(key: string): Promise<void> {
     await this.client.del(key);
   }
