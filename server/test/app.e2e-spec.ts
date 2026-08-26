@@ -6,6 +6,7 @@ import { AppModule } from './../src/app.module';
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { PrismaService } from './../src/database/prisma/prisma.service';
 import { configureApp } from './../src/app-config';
+import { RedisService } from './../src/redis/redis.service';
 
 type AuthResponse = {
   user: {
@@ -67,6 +68,27 @@ describe('AppController (e2e)', () => {
       .expect('Hello World!');
   });
 
+  it('allows the configured browser origin with credentials', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/')
+      .set('Origin', 'http://localhost:3001')
+      .expect(200);
+
+    expect(response.headers['access-control-allow-origin']).toBe(
+      'http://localhost:3001',
+    );
+    expect(response.headers['access-control-allow-credentials']).toBe('true');
+  });
+
+  it('does not allow an untrusted browser origin', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/')
+      .set('Origin', 'https://attacker.example')
+      .expect(200);
+
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
   afterEach(async () => {
     await app.close();
   });
@@ -77,6 +99,26 @@ describe('AppController (e2e)', () => {
       redis: 'up',
     });
   });
+
+  it('enforces the Redis rate-limit counter atomically', async () => {
+    const redis = app.get(RedisService);
+    const key = `e2e:rate-limit:${Date.now()}`;
+
+    try {
+      await expect(redis.consumeRateLimit(key, 60, 2)).resolves.toEqual(
+        expect.objectContaining({ allowed: true }),
+      );
+      await expect(redis.consumeRateLimit(key, 60, 2)).resolves.toEqual(
+        expect.objectContaining({ allowed: true }),
+      );
+      await expect(redis.consumeRateLimit(key, 60, 2)).resolves.toEqual(
+        expect.objectContaining({ allowed: false }),
+      );
+    } finally {
+      await redis.del(key);
+    }
+  });
+
   it('/api/auth/ok (GET)', () => {
     return request(app.getHttpServer()).get('/api/auth/ok').expect(200);
   });

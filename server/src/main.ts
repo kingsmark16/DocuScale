@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { configureApp } from './app-config';
 
@@ -7,7 +8,8 @@ async function bootstrap() {
     bodyParser: false,
   });
 
-  configureApp(app);
+  const configService = app.get(ConfigService);
+  configureApp(app, configService.get<string>('CLIENT_URL'));
 
   app.enableShutdownHooks();
 
