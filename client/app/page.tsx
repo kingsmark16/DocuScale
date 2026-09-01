@@ -1,4 +1,6 @@
 import { AuthPanel } from "./auth-panel";
+import { DocumentsList } from "./document-list";
+import { WorkspaceCreateForm } from "./workspace-create-form";
 import { WorkspaceSelector } from "./workspace-selector";
 
 export default function Home() {
@@ -8,7 +10,9 @@ export default function Home() {
       <p className="text-zinc-600">Document collaboration, built for teams.</p>
 
       <AuthPanel />
+      <WorkspaceCreateForm/>
       <WorkspaceSelector/>
+      <DocumentsList/>
     </main>
   );
 }
