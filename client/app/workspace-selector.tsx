@@ -2,7 +2,7 @@
 
 import { authClient } from "@/lib/auth-client";
 import { useWorkspaceStore } from "@/lib/workspace-store";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === "object" && error !== null && "message" in error) {
@@ -18,6 +18,25 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 export function WorkspaceSelector() {
   const { data: session, isPending } = authClient.useSession();
+
+  const setWorkspaceId = useWorkspaceStore((state) => state.setWorkspaceId);
+
+  const clearWorkspace = useWorkspaceStore((state) => state.clearWorkspace);
+
+  const activeOrganizationId = session?.session.activeOrganizationId ?? null;
+
+  useEffect(() => {
+    if (isPending) {
+      return;
+    }
+
+    if (activeOrganizationId) {
+      setWorkspaceId(activeOrganizationId);
+      return;
+    }
+
+    clearWorkspace();
+  }, [activeOrganizationId, clearWorkspace, isPending, setWorkspaceId]);
 
   if (isPending) {
     return <p>Checking authentication before loading workspaces.</p>;
